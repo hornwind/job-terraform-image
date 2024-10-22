@@ -1,0 +1,51 @@
+on:
+  push:
+    branches: ['main']
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/terraform-job
+  BASE_IMAGE: "alpine:3.20.1"
+
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+
+    permissions:
+        contents: read
+        packages: write
+        attestations: write
+        id-token: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - linux/amd64
+          # - linux/arm64
+        tf_version:
+          - 1.9.8
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: ${{ matrix.platform }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tf_version }}
+          build-args: |
+            BASE_IMAGE=${{ env.BASE_IMAGE }}
+            TERRAFORM_BINARY_VERSION=${{ matrix.tf_version }}
+            TARGETARCH=${{ matrix.platform }}
